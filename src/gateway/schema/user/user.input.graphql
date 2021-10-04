@@ -1,0 +1,10 @@
+input UserRegisterInput {
+    username: String!
+    password: String!
+    repeatPassword: String!
+}
+
+input UserLoginInput {
+    username: String!
+    password: String!
+}

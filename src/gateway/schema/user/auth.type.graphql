@@ -1,0 +1,8 @@
+type TokenPayloadDto {
+    expiresIn: Int
+    accessToken: String
+}
+type RegisterPayload {
+    user: User
+    token: TokenPayloadDto
+}

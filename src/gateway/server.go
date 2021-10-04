@@ -1,17 +1,19 @@
 package main
 
 import (
-	"fmt"
+	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/ducnguyen96/ducnguyen96.xyz-apis/gateway/graph/generated"
+	graph "github.com/ducnguyen96/ducnguyen96.xyz-apis/gateway/graph/resolver"
 	pb "github.com/ducnguyen96/ducnguyen96.xyz-protos/protogen/v1"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
 	"log"
-	"net/http"
 )
 
-func main() {
+func graphqlHandler() gin.HandlerFunc {
 	// Set up a connection to the server.
-	conn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
+	authConn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
@@ -21,32 +23,33 @@ func main() {
 		if err != nil {
 
 		}
-	}(conn)
+	}(authConn)
 
-	client := pb.NewGreeterClient(conn)
+	authClient := pb.NewGreeterClient(authConn)
 
+	h := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &graph.Resolver{
+		AuthClient: authClient,
+	}}))
+
+	return func(c *gin.Context) {
+		h.ServeHTTP(c.Writer, c.Request)
+	}
+}
+
+// Defining the Playground handler
+func playgroundHandler() gin.HandlerFunc {
+	h := playground.Handler("GraphQL", "/graphql")
+
+	return func(c *gin.Context) {
+		h.ServeHTTP(c.Writer, c.Request)
+	}
+}
+
+func main() {
 	// Set up a http server.
 	r := gin.Default()
-	r.GET("/hello/:name", func(c *gin.Context) {
-		name := c.Param("name")
-
-		// Contact the server and print out its response.
-		req := &pb.HelloRequest{Name: name}
-
-		res, err := client.SayHello(c, req)
-
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"result": fmt.Sprint(res.Message),
-		})
-	})
-
+	r.POST("/graphql", graphqlHandler())
+	r.GET("/graphql", playgroundHandler())
 	if err := r.Run(); err != nil { // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
 		panic("Error")
 	}

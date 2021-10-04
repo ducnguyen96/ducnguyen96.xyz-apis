@@ -1,0 +1,21 @@
+type User {
+    id: ID!
+    username: String!
+    avatar: String!
+    remindMe: Boolean!
+    wakeUpTime: String!
+    sleepTime: String!
+    gender:GENDER!
+    weight: Float!
+    dailyIntake: Int!
+    containerImage: String!
+    containerVolume: Int!
+    drinkAtATime: Int!
+    createdAt: String!
+    updatedAt: String!
+}
+
+enum GENDER {
+    MALE
+    FEMALE
+}

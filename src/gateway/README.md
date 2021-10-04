@@ -113,3 +113,139 @@ go run authservice/server.go
 ```shell
 curl -v 'http://localhost:8080/hello/ducnguyen96'
 ```
+
+## 6. Thêm graphql cho gateway
+### 6.1. Write Schema
+### 6.2. Config gqlgen.yaml
+Tham khảo thêm ở [đây](https://gqlgen.com/config/)
+```yaml
+# Where are all the schema files located? globs are supported eg  src/**/*.graphqls
+schema:
+  - schema/**/*.graphqls
+  - schema/**/*.graphql
+# Where should the generated server code go?
+exec:
+  filename: graph/generated/generated.go
+  package: generated
+
+#exec:
+#  package: resolver
+#  filename: resolver/
+# Uncomment to enable federation
+# federation:
+#   filename: graph/generated/federation.go
+#   package: generated
+
+# Where should any generated models go?
+model:
+  filename: graph/model/models_gen.go
+  package: model
+
+# Where should the resolver implementations go?
+resolver:
+  layout: follow-schema
+  dir: graph/resolver
+  package: graph
+  filename_template: '{name}.resolvers.go'
+
+# Optional: turn on use `gqlgen:"fieldName"` tags in your models
+# struct_tag: json
+
+# Optional: turn on to use []Thing instead of []*Thing
+# omit_slice_element_pointers: false
+
+# Optional: set to speed up generation time by not performing a final validation pass.
+# skip_validation: true
+
+# gqlgen will search for any type names in the schema in these go packages
+# if they match it will use them, otherwise it will generate them.
+autobind:
+  - 'github.com/ducnguyen96/ducnguyen96.xyz-apis/gateway'
+
+# This section declares type mapping between the GraphQL and go type systems
+#
+# The first line in each type will be used as defaults for resolver arguments and
+# modelgen, the others will be allowed when binding to fields. Configure them to
+# your liking
+models:
+  ID:
+    model:
+      - github.com/99designs/gqlgen/graphql.ID
+      - github.com/99designs/gqlgen/graphql.Int
+      - github.com/99designs/gqlgen/graphql.Int64
+      - github.com/99designs/gqlgen/graphql.Int32
+  Int:
+    model:
+      - github.com/99designs/gqlgen/graphql.Int
+      - github.com/99designs/gqlgen/graphql.Int64
+      - github.com/99designs/gqlgen/graphql.Int32
+```
+### 6.3. Get gqlgen
+```shell
+go get -d github.com/99designs/gqlgen
+```
+### 6.3. Gen
+```shell
+go run github.com/99designs/gqlgen generate
+```
+### 6.4. graphqlHandler
+1. Add Resolver for graph
+```go
+// graph/resolver/resolver.go
+import (
+pb "github.com/ducnguyen96/ducnguyen96.xyz-protos/protogen/v1"
+)
+type Resolver struct{
+	AuthClient pb.GreeterClient
+}
+```
+2. Map client in resolver
+```go
+func graphqlHandler() gin.HandlerFunc {
+	// Set up a connection to the server.
+	authConn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+
+	defer func(conn *grpc.ClientConn) {
+		err := conn.Close()
+		if err != nil {
+
+		}
+	}(authConn)
+
+	authClient := pb.NewGreeterClient(authConn)
+
+	h := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &graph.Resolver{
+		AuthClient: authClient,
+	}}))
+
+	return func(c *gin.Context) {
+		h.ServeHTTP(c.Writer, c.Request)
+	}
+}
+```
+3. Use graphqlHandler
+```go
+func main() {
+	// Set up a http server.
+	r := gin.Default()
+	r.POST("/graphql", graphqlHandler())
+	r.GET("/graphql", playgroundHandler())
+	if err := r.Run(); err != nil { // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
+		panic("Error")
+	}
+}
+```
+4. GraphqlPlayground
+```go
+// Defining the Playground handler
+func playgroundHandler() gin.HandlerFunc {
+	h := playground.Handler("GraphQL", "/graphql")
+
+	return func(c *gin.Context) {
+		h.ServeHTTP(c.Writer, c.Request)
+	}
+}
+```
