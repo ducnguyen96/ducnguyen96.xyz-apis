@@ -1,7 +1,7 @@
 package main
 
 import (
-	"context"
+	"github.com/ducnguyen96/ducnguyen96.xyz-apis/authservice/service"
 	pb "github.com/ducnguyen96/ducnguyen96.xyz-protos/protogen/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -9,16 +9,6 @@ import (
 	"net"
 )
 
-// server is used to implement utils.GreeterServer
-type server struct {
-	// Embed the unimplemented server
-	pb.UnimplementedGreeterServer
-}
-
-// SayHello implements utils.GreeterServer
-func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloReply, error) {
-	return &pb.HelloReply{Message: "Hello " + in.Name}, nil
-}
 
 func main() {
 	// listening to tcp
@@ -29,7 +19,7 @@ func main() {
 
 	// gRPC server
 	s := grpc.NewServer()
-	pb.RegisterGreeterServer(s, &server{})
+	pb.RegisterAuthServiceServer(s, &service.AuthService{})
 
 	// Register reflection service on gRPC server.
 	reflection.Register(s)

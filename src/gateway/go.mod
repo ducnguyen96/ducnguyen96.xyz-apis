@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/99designs/gqlgen v0.14.0
-	github.com/ducnguyen96/ducnguyen96.xyz-protos v0.0.0-20211004094301-013637197909
+	github.com/ducnguyen96/ducnguyen96.xyz-protos v1.0.11
 	github.com/gin-gonic/gin v1.7.4
 	github.com/vektah/gqlparser/v2 v2.2.0
 	google.golang.org/grpc v1.41.0

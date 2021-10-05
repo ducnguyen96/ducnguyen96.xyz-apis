@@ -3,7 +3,7 @@ module github.com/ducnguyen96/ducnguyen96.xyz-apis/authservice
 go 1.17
 
 require (
-	github.com/ducnguyen96/ducnguyen96.xyz-protos v0.0.0-20211004094301-013637197909
+	github.com/ducnguyen96/ducnguyen96.xyz-protos v1.0.11
 	google.golang.org/grpc v1.41.0
 )
 

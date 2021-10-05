@@ -17,15 +17,7 @@ func graphqlHandler() gin.HandlerFunc {
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
-
-	defer func(conn *grpc.ClientConn) {
-		err := conn.Close()
-		if err != nil {
-
-		}
-	}(authConn)
-
-	authClient := pb.NewGreeterClient(authConn)
+	authClient := pb.NewAuthServiceClient(authConn)
 
 	h := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &graph.Resolver{
 		AuthClient: authClient,

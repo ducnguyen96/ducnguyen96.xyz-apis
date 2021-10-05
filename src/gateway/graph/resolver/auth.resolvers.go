@@ -5,14 +5,31 @@ package graph
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/ducnguyen96/ducnguyen96.xyz-apis/gateway/graph/model/mapping"
+	pb "github.com/ducnguyen96/ducnguyen96.xyz-protos/protogen/v1"
 
 	"github.com/ducnguyen96/ducnguyen96.xyz-apis/gateway/graph/generated"
 	"github.com/ducnguyen96/ducnguyen96.xyz-apis/gateway/graph/model"
 )
 
 func (r *mutationResolver) Register(ctx context.Context, input model.UserRegisterInput) (*model.RegisterPayload, error) {
-	panic(fmt.Errorf("not implemented"))
+	fmt.Println("input :", input)
+	// validation here
+
+	res, err := r.AuthClient.Register(ctx, &pb.UserRegisterInput{
+		Username:       input.Username,
+		Password:       input.Password,
+		RepeatPassword: input.RepeatPassword,
+	})
+	if err != nil {
+		return nil, errors.New(err.Error())
+	}
+	return &model.RegisterPayload{
+		User:  mapping.UserEntity(res.User),
+		Token: mapping.TokenPayloadDto(res.Token),
+	}, nil
 }
 
 func (r *mutationResolver) Login(ctx context.Context, input model.UserLoginInput) (*model.TokenPayloadDto, error) {

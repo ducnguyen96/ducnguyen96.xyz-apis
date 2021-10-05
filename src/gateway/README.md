@@ -3,7 +3,7 @@ Sau khi có [protos](https://github.com/ducnguyen96/ducnguyen96.xyz-protos) ta s
 Tham khảo thêm [ở đây](https://github.com/gin-gonic/examples/tree/master/grpc)
 ## 1. Get proto
 ```shell
-go get github.com/ducnguyen96/ducnguyen96.xyz-protos
+go get -x github.com/ducnguyen96/ducnguyen96.xyz-protos@latest
 ```
 
 ## 2. Setup HTTP Server và gRPC client cho gateway
@@ -208,13 +208,6 @@ func graphqlHandler() gin.HandlerFunc {
 		log.Fatalf("did not connect: %v", err)
 	}
 
-	defer func(conn *grpc.ClientConn) {
-		err := conn.Close()
-		if err != nil {
-
-		}
-	}(authConn)
-
 	authClient := pb.NewGreeterClient(authConn)
 
 	h := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &graph.Resolver{
@@ -247,5 +240,172 @@ func playgroundHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		h.ServeHTTP(c.Writer, c.Request)
 	}
+}
+```
+## 7. Update gRPC AuthService Client
+### 7.1. Update proto
+```protobuf
+syntax = "proto3";
+
+import "protos/user/user_entity.proto";
+
+package protogen;
+option go_package = "protogen/v1";
+
+service AuthService {
+  rpc Register (UserRegisterInput) returns (RegisterPayload) {}
+  rpc Login (UserLoginInput) returns (TokenPayloadDto) {}
+}
+
+message UserRegisterInput {
+  string username = 1;
+  string password = 2;
+  string repeatPassword = 3;
+}
+
+message  UserLoginInput {
+  string username = 1;
+  string password = 2;
+}
+
+message RegisterPayload {
+  optional UserEntity user = 1;
+  optional TokenPayloadDto token = 2;
+}
+
+message TokenPayloadDto {
+  optional int32 expiresIn = 1;
+  optional string accessToken = 2;
+}
+```
+### 7.2. Update gRPC client on gateway
+`gateway/server.go`
+```go
+authClient := pb.NewAuthServiceClient(authConn)
+
+h := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &graph.Resolver{
+	AuthClient: authClient
+}}))
+```
+`gateway/graph/resolver/resolver.go`
+```go
+package graph
+
+import (
+	pb "github.com/ducnguyen96/ducnguyen96.xyz-protos/protogen/v1"
+)
+
+// This file will not be regenerated automatically.
+//
+// It serves as dependency injection for your app, add any dependencies you require here.
+
+type Resolver struct{
+	AuthClient pb.AuthServiceClient
+}
+```
+### 7.3. Update gRPC server on authservice
+Lưu ý: path version của go bắt đầu từ 10 (ví dụ: @x.x.1) không thể bắt đầu từ 01 (ví dụ: @x.x.01)
+```shell
+go get -x github.com/ducnguyen96/ducnguyen96.xyz-protos@1.0.11
+```
+
+### 8. Implement Resolvers on gateway
+```go
+func (r *mutationResolver) Register(ctx context.Context, input model.UserRegisterInput) (*model.RegisterPayload, error) {
+	fmt.Println("input :", input)
+	// validations heere
+	
+	res, err := r.AuthClient.Register(ctx, &pb.UserRegisterInput{
+		Username:       input.Username,
+		Password:       input.Password,
+		RepeatPassword: input.RepeatPassword,
+	})
+	if err != nil {
+		return nil, errors.New(err.Error())
+	}
+	return &model.RegisterPayload{
+		User:  mapping.UserEntity(res.User),
+		Token: mapping.TokenPayloadDto(res.Token),
+	}, nil
+}
+```
+Mapping
+```go
+package mapping
+
+import (
+	"github.com/ducnguyen96/ducnguyen96.xyz-apis/gateway/graph/model"
+	"github.com/ducnguyen96/ducnguyen96.xyz-apis/gateway/utils"
+	pb "github.com/ducnguyen96/ducnguyen96.xyz-protos/protogen/v1"
+)
+
+func UserEntity(user *pb.UserEntity) *model.User {
+	return &model.User{
+		ID:              utils.Uint64ToString(user.Id),
+		Username:        user.Username,
+		Avatar:          user.Avatar,
+		RemindMe:        user.RemindMe,
+		WakeUpTime:      user.WakeUpTime,
+		SleepTime:       user.SleepTime,
+		Gender:          Gender(user.Gender),
+		Weight:          utils.Float32ToFloat64(user.Weight),
+		DailyIntake:     utils.Int32ToInt(user.DailyIntake),
+		ContainerImage:  user.ContainerImage,
+		ContainerVolume: utils.Int32ToInt(user.ContainerVolume),
+		DrinkAtATime:    utils.Int32ToInt(user.DrinkAtATime),
+		CreatedAt:       user.CreatedAt,
+		UpdatedAt:       user.UpdatedAt,
+	}
+}
+
+func Gender(gender pb.Gender) model.Gender {
+	switch gender {
+	case pb.Gender_FEMALE:
+		return model.GenderFemale
+	default:
+		return model.GenderMale
+	}
+}
+```
+## 9. Implement service on authservice
+`server.go`
+```go
+func main() {
+	// listening to tcp
+	lis, err := net.Listen("tcp", ":50051")
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+
+	// gRPC server
+	s := grpc.NewServer()
+	pb.RegisterAuthServiceServer(s, &service.AuthService{})
+
+	// Register reflection service on gRPC server.
+	reflection.Register(s)
+	if err := s.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
+	}
+}
+```
+`authservice/service/auth.go`
+```go
+package service
+
+import (
+	"context"
+	"fmt"
+	pb "github.com/ducnguyen96/ducnguyen96.xyz-protos/protogen/v1"
+)
+
+type AuthService struct {
+	pb.UnimplementedAuthServiceServer
+	AuthClient pb.AuthServiceClient
+}
+
+func (c *AuthService) Register(ctx context.Context, input *pb.UserRegisterInput) (*pb.RegisterPayload, error) {
+	out := new(pb.RegisterPayload)
+	fmt.Println(input)
+	return out, nil
 }
 ```
