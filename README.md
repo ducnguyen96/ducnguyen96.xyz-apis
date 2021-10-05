@@ -409,3 +409,308 @@ func (c *AuthService) Register(ctx context.Context, input *pb.UserRegisterInput)
 	return out, nil
 }
 ```
+## 10. Postgres on Authservice
+### 10.1. Add autoload `.env`
+```go
+// server.go
+import (
+    _ "github.com/joho/godotenv/autoload"
+)
+```
+### 10.2. Install entgo and init schema
+```shell
+go get entgo.io/ent/cmd/ent
+go run entgo.io/ent/cmd/ent init User
+```
+### 10.3. Create client and connect
+```go
+func main() {
+	// pg database
+	username := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+	dbName := os.Getenv("DB_NAME")
+	dbHost := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
+	dbUri := fmt.Sprintf("host=%s user=%s dbname=%s sslmode=disable password=%s port=%s", dbHost, username, dbName, password, dbPort) //Build connection string
+
+	client, err := ent.Open("postgres", dbUri)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Run the auto migration tool.
+	if err := client.Schema.Create(context.Background()); err != nil {
+		log.Fatalf("failed creating schema resources: %v", err)
+	}
+
+	defer func(client *ent.Client) {
+		err := client.Close()
+		if err != nil {
+
+		}
+	}(client)
+}
+```
+## 11. Entgo + Postgres 
+### 11.0. Setup Clients
+Tham khảo ở [đây](https://entgo.io/docs/getting-started)
+
+Lưu ý để mixin có thể chạy được mixin cho `created_at` và `updated_at` thì cần import `runtime` ở đây
+```go
+_ "github.com/ducnguyen96/ducnguyen96.xyz-apis/authservice/ent/runtime"
+```
+
+`server.go`
+```go
+func main() {
+	// pg database
+	username := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+	dbName := os.Getenv("DB_NAME")
+	dbHost := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
+	dbUri := fmt.Sprintf("host=%s user=%s dbname=%s sslmode=disable password=%s port=%s", dbHost, username, dbName, password, dbPort) //Build connection string
+
+	readClient, err := ent.Open("postgres", dbUri)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	writeClient, err := ent.Open("postgres", dbUri)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Run the auto migration tool.
+	if err := readClient.Schema.Create(context.Background()); err != nil {
+		log.Fatalf("failed creating schema resources: %v", err)
+	}
+
+	defer func(client *ent.Client) {
+		err := client.Close()
+		if err != nil {
+
+		}
+	}(readClient)
+
+
+	// listening to tcp
+	lis, err := net.Listen("tcp", ":50051")
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+
+	// gRPC server
+	s := grpc.NewServer()
+	pb.RegisterAuthServiceServer(s, &service.AuthService{
+		ReadDB:                         readClient.Debug(),
+		WriteDB:                        writeClient.Debug(),
+	})
+
+	// Register reflection service on gRPC server.
+	reflection.Register(s)
+	if err := s.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
+	}
+}
+```
+### 11.1. Mixin, hook, Enum
+tham khảo thêm tại [đây](https://entgo.io/docs/faq/)
+```go
+// BaseMixin to be shared will all different schemas.
+type BaseMixin struct {
+	mixin.Schema
+}
+
+// Fields of the Mixin.
+func (BaseMixin) Fields() []ent.Field {
+	return []ent.Field{
+		field.Uint64("id"),
+		field.Time("created_at").Immutable().Default(time.Now),
+		field.Time("updated_at").
+			Default(time.Now).
+			UpdateDefault(time.Now),
+	}
+}
+
+// Hooks of the Mixin.
+func (BaseMixin) Hooks() []ent.Hook {
+	return []ent.Hook{
+		hook.On(IDHook(), ent.OpCreate),
+	}
+}
+
+func IDHook() ent.Hook {
+	sf := sonyflake.NewSonyflake(sonyflake.Settings{})
+	type IDSetter interface {
+		SetID(uint64)
+	}
+	return func(next ent.Mutator) ent.Mutator {
+		return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+			is, ok := m.(IDSetter)
+			if !ok {
+				return nil, fmt.Errorf("unexpected mutation %T", m)
+			}
+			id, err := sf.NextID()
+			if err != nil {
+				return nil, err
+			}
+			is.SetID(id)
+			return next.Mutate(ctx, m)
+		})
+	}
+}
+
+type Gender int
+
+const (
+	Male Gender = iota
+	Female
+)
+
+func (p Gender) String() string {
+	switch p {
+	case Female:
+		return "FEMALE"
+	default:
+		return "MALE"
+	}
+}
+
+// Values provides list valid values for Enum.
+func (Gender) Values() []string {
+	return []string{Male.String(), Female.String()}
+}
+
+// Value provides the DB a string from int.
+func (p Gender) Value() (driver.Value, error) {
+	return p.String(), nil
+}
+
+// Scan tells our code how to read the enum into our type.
+func (p *Gender) Scan(val interface{}) error {
+	var s string
+	switch v := val.(type) {
+	case nil:
+		return nil
+	case string:
+		s = v
+	case []uint8:
+		s = string(v)
+	}
+	switch s {
+	case "FEMALE":
+		*p = Female
+	default:
+		*p = Male
+	}
+	return nil
+}
+```
+### 11.2. User Schema
+```go
+// User holds the schema definition for the User entity.
+type User struct {
+	ent.Schema
+}
+
+// Fields of the User.
+func (User) Fields() []ent.Field {
+	return []ent.Field{
+		field.String("username"),
+		field.String("avatar").Default("https://robohash.org/honey?set=set1"),
+		field.Bool("remind_me").Default(true),
+		field.Time("wake_up_time"),
+		field.Time("sleep_time"),
+		field.Enum("gender").GoType(Gender(0)),
+		field.Float32("weight").Default(50),
+		field.Int32("daily_intake").Default(1500),
+		field.String("container_image").Default("images/glass-of-water.png"),
+		field.Int32("container_volume").Default(300),
+		field.Int32("drink_at_a_time").Default(300),
+		field.String("password"),
+	}
+}
+
+// Mixin of the User.
+func (User) Mixin() []ent.Mixin {
+	return []ent.Mixin{
+		// Embed the BaseMixin in the user schema.
+		BaseMixin{},
+	}
+}
+```
+### 11.3. Generate
+```shell
+go run entgo.io/ent/cmd/ent generate ./ent/schema
+```
+
+### 12. JWT and Register method
+Tham khảo thêm tại [đây](https://medium.com/@jcox250/password-hash-salt-using-golang-b041dc94cb72)
+```go
+var mySigningKey = []byte(os.Getenv("AUTH_SECRET_KEY"))
+
+func (c *AuthService) Register(ctx context.Context, input *pb.UserRegisterInput) (*pb.RegisterPayload, error) {
+	// check if username existed
+	existedUser, err := c.ReadDB.User.Query().Where(user.Username(input.Username)).Count(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed querying user: %w", err)
+	}
+
+	if existedUser > 0 {
+		return nil, fmt.Errorf("username existed")
+	}
+
+	// create hashed password
+	// Tham khảo tại https://medium.com/@jcox250/password-hash-salt-using-golang-b041dc94cb72
+	pwd := []byte(input.Password)
+	hashedPwd, err := bcrypt.GenerateFromPassword(pwd, bcrypt.DefaultCost)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed hashing password: %w", err)
+	}
+
+	// Create new user
+	now := time.Now()
+	wut := time.Date(now.Year(), now.Month(), now.Day(), 22, 0, 0, 0, now.Location())
+	slt := time.Date(now.Year(), now.Month(), now.Day(), 16, 0, 0, 0, now.Location())
+
+	userCreated, err := c.WriteDB.User.Create().
+		SetUsername(input.Username).
+		SetPassword(string(hashedPwd)).
+		SetWakeUpTime(wut).
+		SetSleepTime(slt).
+		SetGender(schema.Gender(0)).
+		Save(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed creating new user: %w", err)
+	}
+
+	// Create the Claims
+	// Tham khảo https://pkg.go.dev/github.com/golang-jwt/jwt#example-NewWithClaims-CustomClaimsType
+	claims := MyCustomClaims{
+		fmt.Sprint(userCreated.Username),
+		jwt.StandardClaims{
+			// In JWT, the expiry time is expressed as unix milliseconds
+			ExpiresAt: time.Now().Add(time.Hour * 24 * 30).Unix(),
+			Issuer:    "test",
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	ss, err := token.SignedString(mySigningKey)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed signing token: %w", err)
+	}
+
+	return &pb.RegisterPayload{
+		User:  utils.MapUserRecordToUserProto(userCreated),
+		Token: &pb.TokenPayloadDto{
+			ExpiresIn:   utils.IntToOptionalInt32(15000),
+			AccessToken: &ss,
+		},
+	}, nil
+}
+```
