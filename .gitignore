@@ -210,7 +210,9 @@ skaffold-dev.yaml
 _proto/
 # End of https://www.toptal.com/developers/gitignore/api/go,macos,linux,windows,vscode,intellij
 
-skaffold-*.yaml
 docker-compose.local.yml
 src/**/.env
 /_shared/
+
+infras/depls/**/*.yaml
+infras/ingress/**/*.yaml

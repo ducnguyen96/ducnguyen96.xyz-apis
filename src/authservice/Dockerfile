@@ -22,7 +22,7 @@ FROM alpine
 
 WORKDIR /
 
-COPY --from=builder /service ./server
+COPY --from=build /service ./server
 
 ENV PORT=50051
 EXPOSE 50051

@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway-pg-depl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway-pg
+  template:
+    metadata:
+      labels:
+        app: gateway-pg
+    spec:
+      containers:
+        - name: gateway-pg
+          image: postgres:13.4
+          env:
+            - name: POSTGRES_PASSWORD
+              value: example
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-pg-srv
+spec:
+  selector:
+    app: gateway-pg
+  ports:
+    - name: db
+      protocol: TCP
+      port: 5432
+      targetPort: 5432

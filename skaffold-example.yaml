@@ -1,0 +1,30 @@
+apiVersion: skaffold/v2beta21
+kind: Config
+deploy:
+  kubectl:
+    manifests:
+      - ./infras/depls/gateway-depl.yaml
+      - ./infras/depls/gateway-pg-depl.yaml
+      - ./infras/depls/auth-depl.yaml
+      - ./infras/depls/auth-pg-depl.yaml
+      - ./infras/depls/ingress-depl.yaml
+build:
+  local:
+    push: false
+  artifacts:
+    - image: ducnguyen96/dn96apis-gateway
+      context: ./src/gateway
+      docker:
+        dockerfile: Dockerfile
+      sync:
+        manual:
+          - src: "./**/*.ts"
+            dest: .
+    - image: ducnguyen96/dn96apis-auth
+      context: ./src/authservice
+      docker:
+        dockerfile: Dockerfile
+      sync:
+        manual:
+          - src: "./**/*.ts"
+            dest: .
