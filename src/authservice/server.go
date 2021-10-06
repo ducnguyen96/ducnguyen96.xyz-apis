@@ -10,10 +10,12 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 	_ "github.com/lib/pq"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
 	"log"
 	"net"
 	"os"
+	"time"
 )
 
 func main() {
@@ -55,7 +57,12 @@ func main() {
 	}
 
 	// gRPC server
-	s := grpc.NewServer()
+	srvParams := keepalive.ServerParameters{
+		Time:                  10 * time.Second, // default value is 2 hours
+		Timeout:               5 * time.Second,  // default value is 20 seconds
+	}
+	opts := []grpc.ServerOption{grpc.KeepaliveParams(srvParams)}
+	s := grpc.NewServer(opts...)
 	pb.RegisterAuthServiceServer(s, &service.AuthService{
 		ReadDB:                         readClient.Debug(),
 		WriteDB:                        writeClient.Debug(),

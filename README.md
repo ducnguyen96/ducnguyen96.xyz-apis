@@ -714,3 +714,31 @@ func (c *AuthService) Register(ctx context.Context, input *pb.UserRegisterInput)
 	}, nil
 }
 ```
+## 13. gRPC keepalive
+Tham khảo: https://ducnguyen96.github.io/posts/backend/using-grpc-in-production-keep-alive/
+
+`authservice`
+```go
+// server.go
+	// gRPC server
+	srvParams := keepalive.ServerParameters{
+		Time:                  10 * time.Second, // default value is 2 hours
+		Timeout:               5 * time.Second,  // default value is 20 seconds
+	}
+	opts := []grpc.ServerOption{grpc.KeepaliveParams(srvParams)}
+	s := grpc.NewServer(opts...)
+
+```
+
+`gateway`
+```go
+// server.go
+	// Set up a connection to the server.
+	kacp := keepalive.ClientParameters{
+		Time:                10 * time.Second, // send pings every 20 seconds if there is no activity
+		Timeout:             10 * time.Second, // wait 10 second for ping back
+		PermitWithoutStream: true,             // send pings even without active streams
+	}
+
+	authConn, err := grpc.Dial("localhost:50051", grpc.WithInsecure(), grpc.WithKeepaliveParams(kacp))
+```

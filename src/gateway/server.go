@@ -8,12 +8,20 @@ import (
 	pb "github.com/ducnguyen96/ducnguyen96.xyz-protos/protogen/v1"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 	"log"
+	"time"
 )
 
 func graphqlHandler() gin.HandlerFunc {
 	// Set up a connection to the server.
-	authConn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
+	kacp := keepalive.ClientParameters{
+		Time:                10 * time.Second, // send pings every 20 seconds if there is no activity
+		Timeout:             10 * time.Second, // wait 10 second for ping back
+		PermitWithoutStream: true,             // send pings even without active streams
+	}
+
+	authConn, err := grpc.Dial("localhost:50051", grpc.WithInsecure(), grpc.WithKeepaliveParams(kacp))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
