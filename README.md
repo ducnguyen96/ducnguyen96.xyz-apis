@@ -742,3 +742,38 @@ Tham khảo: https://ducnguyen96.github.io/posts/backend/using-grpc-in-productio
 
 	authConn, err := grpc.Dial("localhost:50051", grpc.WithInsecure(), grpc.WithKeepaliveParams(kacp))
 ```
+## 14. Dockerfile
+Tham khảo: https://docs.docker.com/language/golang/build-images/#multi-stage-builds
+```dockerfile
+# syntax=docker/dockerfile:1
+
+##
+## Build
+##
+FROM golang:1.17-alpine AS build
+
+WORKDIR /app
+
+COPY go.mod ./
+COPY go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN go build -o /service .
+
+##
+## Deploy
+##
+FROM alpine
+
+WORKDIR /
+
+COPY --from=builder /service ./server
+
+ENV PORT=50051
+EXPOSE 50051
+
+ENTRYPOINT ["/server"]
+
+```
