@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 	"log"
+	"net/http"
 	"time"
 )
 
@@ -48,6 +49,9 @@ func playgroundHandler() gin.HandlerFunc {
 func main() {
 	// Set up a http server.
 	r := gin.Default()
+	r.GET("/hello", func(c *gin.Context) {
+		c.String(http.StatusOK, "hello world")
+	})
 	r.POST("/graphql", graphqlHandler())
 	r.GET("/graphql", playgroundHandler())
 	if err := r.Run(); err != nil { // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")

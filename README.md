@@ -777,3 +777,18 @@ EXPOSE 50051
 ENTRYPOINT ["/server"]
 
 ```
+## 15. Live Reload
+Nguồn: https://github.com/cosmtrek/air
+### 15.1. Install Air
+```shell
+curl -sSfL https://raw.githubusercontent.com/cosmtrek/air/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+```
+### 15.2. Init air config
+```shell
+cd ./to-your-project-directory
+air init
+```
+### 15.3. Air with log
+```shell
+air -d
+```
