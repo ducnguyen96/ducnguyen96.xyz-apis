@@ -792,3 +792,5 @@ air init
 ```shell
 air -d
 ```
+## 16. Multipart Upload
+Tham khảo https://github.com/ducnguyen96/uploader

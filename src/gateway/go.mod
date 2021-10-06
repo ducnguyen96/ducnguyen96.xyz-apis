@@ -4,8 +4,10 @@ go 1.17
 
 require (
 	github.com/99designs/gqlgen v0.14.0
+	github.com/aws/aws-sdk-go v1.40.56
 	github.com/ducnguyen96/ducnguyen96.xyz-protos v1.0.11
 	github.com/gin-gonic/gin v1.7.4
+	github.com/joho/godotenv v1.4.0
 	github.com/vektah/gqlparser/v2 v2.2.0
 	google.golang.org/grpc v1.41.0
 )
@@ -19,6 +21,7 @@ require (
 	github.com/golang/protobuf v1.5.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/hashicorp/golang-lru v0.5.0 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/json-iterator/go v1.1.9 // indirect
 	github.com/leodido/go-urn v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect

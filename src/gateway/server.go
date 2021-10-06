@@ -5,6 +5,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/ducnguyen96/ducnguyen96.xyz-apis/gateway/graph/generated"
 	graph "github.com/ducnguyen96/ducnguyen96.xyz-apis/gateway/graph/resolver"
+	"github.com/ducnguyen96/ducnguyen96.xyz-apis/gateway/service"
 	pb "github.com/ducnguyen96/ducnguyen96.xyz-protos/protogen/v1"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
@@ -54,6 +55,7 @@ func main() {
 	})
 	r.POST("/graphql", graphqlHandler())
 	r.GET("/graphql", playgroundHandler())
+	r.POST("/api/v1/upload", service.Upload)
 	if err := r.Run(); err != nil { // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
 		panic("Error")
 	}
